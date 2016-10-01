@@ -7,18 +7,11 @@
 #include "proc.h"
 #include "spinlock.h"
 
-#define NFRAMES PHYSTOP/PGSIZE
 
 struct {
   struct spinlock lock;
   struct proc proc[NPROC];
 } ptable;
-
-
-struct{ 
-  uint rcount[NFRAMES] = 0;
-  struct spinlock lock;
-} rtable;
 
 
 static struct proc *initproc;
@@ -33,19 +26,6 @@ void
 pinit(void)
 {
   initlock(&ptable.lock, "ptable");
-}
-
-void
-rinit(void)
-{
-  initlock(&rtable.lock, "rtable");
-}
-
-void increment(struct rtable * r, char *va){
-  acquire(&r->lock);
-  uint pa = v2p(va)>>12;
-  rtable.count[pa]++;
-  release(&r->lock);
 }
 
 //PAGEBREAK: 32

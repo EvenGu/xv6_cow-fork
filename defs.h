@@ -10,6 +10,7 @@ struct sleeplock;
 struct stat;
 struct superblock;
 
+
 // bio.c
 void            binit(void);
 struct buf*     bread(uint, uint);
@@ -64,10 +65,17 @@ extern uchar    ioapicid;
 void            ioapicinit(void);
 
 // kalloc.c
+void            rinit(void);
+void 			increment(char*);
+void 			decrement(char*);
+int 			checkZero(char*);
+void 			setOne(char*);
+
 char*           kalloc(void);
 void            kfree(char*);
 void            kinit1(void*, void*);
 void            kinit2(void*, void*);
+// extern struct 	rtable;
 
 // kbd.c
 void            kbdintr(void);
@@ -108,7 +116,6 @@ int             fork(void);
 int             growproc(int);
 int             kill(int);
 void            pinit(void);
-void            rinit(void);
 void            procdump(void);
 void            scheduler(void) __attribute__((noreturn));
 void            sched(void);
