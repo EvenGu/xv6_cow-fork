@@ -273,8 +273,8 @@ deallocuvm(pde_t *pgdir, uint oldsz, uint newsz)
       if(pa == 0)
         panic("kfree");
       char *v = P2V(pa);
-      decrementRcount(pa);
-      if(getRcount(pa)==0){
+      decrementRcount(pa);					//decrease reference count
+      if(getRcount(pa)==0){					//free only if reference count is zero
       	kfree(v);
       }
       *pte = 0;
@@ -332,28 +332,27 @@ copyuvm(pde_t *pgdir, uint sz)
       panic("copyuvm: pte should exist");
     if(!(*pte & PTE_P))
       panic("copyuvm: page not present");
-  	if(*pte&PTE_w)
+
+  	*pte &= ~PTE_PREV;					//clear previous write permission 
+  	if(*pte & PTE_W)					//set previous write permission
   		*pte |= PTE_PREV;
-  	*pte |= PTE_COW;
-  	*pte = *pte & ~PTE_W;
+  	*pte |= PTE_COW;					//set cow flag
+  	*pte &= ~PTE_W;						//change the write permission to read only
 
     pa = PTE_ADDR(*pte);
     flags = PTE_FLAGS(*pte);
 
-    // if((mem = kalloc()) == 0)
-    //   goto bad;
-    // memmove(mem, (char*)P2V(pa), PGSIZE);
-    // if(mappages(d, (void*)i, PGSIZE, V2P(mem), flags) < 0)
-    if(mappages(d, (void*)i, PGSIZE, pa, flags) < 0)
+    if(mappages(d, (void*)i, PGSIZE, pa, flags) < 0)		//map the same pages to child process page table
       goto bad;
   	incrementRcount(pa);
-  	lcr3(V2P(pgdir));				//as flags are changed
+  	lcr3(V2P(pgdir));					//reinstall page table as all entries flags are changed
   }
+
   return d;
 
 bad:
   freevm(d);
-  lcr3(V2P(pgdir));
+  lcr3(V2P(pgdir));						//reinstall page table as some of the entries might be chanaged
   return 0;
 }
 
@@ -399,44 +398,60 @@ copyout(pde_t *pgdir, uint va, void *p, uint len)
 }
 
 
-void pagefault(uint err_code)
+void pagefault(uint err_code)						//page fault handling function
 {
 	uint va = rcr2();
 	uint pa;
-	pte_t = *pte;
+	pte_t *pte;
 	char* mem;
 
-	if(proc == 0){
+	if(proc == 0){															
 		panic("Error no proc");
 	}
-	if(va>=KERNBASE || (pte = walkpgdir(proc->pgdir,(void*)va,0)==0) || !(*pte & PTE_P) || !(*pte & PTE_U)){
-		panic("Some other prob");
-	}
 
-	if(*pte & PTE_W){
+	if(va >= KERNBASE || (pte = walkpgdir(proc->pgdir,(void*)va,0)) == 0 || !(*pte & PTE_P) || !(*pte & PTE_U)){				//check validity of virtual address
+		cprintf("Virtual address out of range or PTE doesnt exist/present or no permission for user\n");
+		proc->killed = 1;
+		return;
+	}
+	if(*pte & PTE_W){ 									//trap even though page was writable
 		panic("Page was writable");
 	}
-	else{
+
+	if(*pte & PTE_COW){									//PTE_W = 0 , PTE_PREV = 0 or 1 , PTE_COW = 1
+														//if trap due to copy on write 
 		pa = PTE_ADDR(*pte);
-		if(getRcount(pa) == 1){
-			*pte = *pte | PTE_W;
+		if(getRcount(pa) == 1){							//only need to change the page table entries
+			*pte &= ~PTE_COW;							//reset the cow flag
+			if(*pte & PTE_PREV)							//restore the previous write permission
+				*pte = *pte | PTE_W;
+			*pte &= ~PTE_PREV;							//reset the previous write permission  
 		}
-		else if(getRcount(pa) > 1){
+		else if(getRcount(pa) > 1){						//allocate new memory image and change the page table
 			mem = kalloc();
 			if(mem == 0){
-
-				panic();
-				proc->killed;
+				cprintf("Out of memory\n");				//out of memory
+				proc->killed = 1;
 				return;
 			}
-			memmove(mem,(char*)p2v(pa),PGSIZE);
-			decrementRcount(va);
-			*pte = v2p(mem) | PTE_P | PTE_W | PTE_U;
+			memmove(mem,(char*)P2V(pa),PGSIZE);					//copy the memory
+			decrementRcount(va);								//decrement reference count
+			if(*pte & PTE_PREV)
+				*pte = V2P(mem) | PTE_P | PTE_U | PTE_W;		//restore previous write permission	
+			else
+				*pte = V2P(mem) | PTE_P | PTE_U ;
+			*pte &= ~PTE_COW;									//reset the cow and previous write permission 
+			*pte &= ~PTE_PREV;
 		}
 		else{
-			panic("Pagefault wrong reference count");
+			panic("Wrong reference count");
 		}
-		lcr3(v2p(proc->pgdir));
+		lcr3(V2P(proc->pgdir));
+	}
+	else{											//PTE_W = 0 , PTE_PREV = 0 or 1 , PTE_COW = 0
+		cprintf("No write permission\n");			//no write permission default is to kill the process
+		proc->killed = 1;
+		return;
 	}
 }
 //PAGEBREAK!

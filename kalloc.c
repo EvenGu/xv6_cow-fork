@@ -9,7 +9,7 @@
 #include "mmu.h"
 #include "spinlock.h"
 
-#define NFRAMES PHYSTOP/PGSIZE
+#define NFRAMES PHYSTOP/PGSIZE          //number of frames
 
 void freerange(void *vstart, void *vend);
 extern char end[]; // first address after kernel loaded from ELF file
@@ -22,42 +22,42 @@ struct {
   struct spinlock lock;
   int use_lock;
   struct run *freelist;
-  int numFreePages;
+  int numFreePages;                 //added an interger to hold count of number of free pages
 } kmem;
 
-
-struct{ 
+  
+struct{                             //reference count structure
   int rcount[NFRAMES];
   struct spinlock lock;
 } rtable;
 
 
 void
-rinit(void)
+rinit(void)                       //initialize reference count structure
 {
   initlock(&rtable.lock, "rtable");
   acquire(&rtable.lock);
   int i;
-  for(i = 0; i< NFRAMES ; i++){
-    rtable.rcount[i] = 0;
+  for(i = 0; i< NFRAMES ; i++){                               //initialize reference count to 0
+    rtable.rcount[i] = 0; 
   }
   // cprintf("\ncpu%d: rinit called\n\n", cpunum());
   release(&rtable.lock);
 }
-
-void incrementRcount(uint pa){
+  
+void incrementRcount(uint pa){                    //increment reference count
   acquire(&rtable.lock);
   rtable.rcount[pa>>PGSHIFT]++;
   release(&rtable.lock);
 }
-void decrementRcount(uint pa){
+void decrementRcount(uint pa){                  //decrement reference count
   acquire(&rtable.lock);
   rtable.rcount[pa>>PGSHIFT]--;
   release(&rtable.lock);
 }
 
 
-int getRcount(uint pa){
+int getRcount(uint pa){                         //get reference count
   acquire(&rtable.lock);
   uint temp = rtable.rcount[pa>>PGSHIFT];
   release(&rtable.lock);
@@ -65,12 +65,12 @@ int getRcount(uint pa){
 }
 
 /*Lock must be held*/
-void setRcount(uint pa,int i){
+void setRcount(uint pa,int i){                //set reference count
   rtable.rcount[pa>>PGSHIFT] = i;
 }
 
-int getNumFreePages(){
-  if(kmem.use_lock){
+int getNumFreePages(){                        //get  number of free pages
+  if(kmem.use_lock){  
     acquire(&kmem.lock);
   }
   int temp = kmem.numFreePages;
@@ -91,7 +91,7 @@ kinit1(void *vstart, void *vend)
   cprintf("\ncpu%d: kinit1 called\n\n", cpunum());
   initlock(&kmem.lock, "kmem");
   kmem.use_lock = 0;
-  kmem.numFreePages = 0;
+  kmem.numFreePages = 0;                        //initalize number of free pages
   freerange(vstart, vend);
 }
 
@@ -134,8 +134,8 @@ kfree(char *v)
   r = (struct run*)v;
   r->next = kmem.freelist;
   kmem.freelist = r;
-  kmem.numFreePages++;
-  setRcount((char*)V2P((uint)r),0);
+  kmem.numFreePages++;                            //increment free page count
+  setRcount((uint)V2P((uint)r),0);                //set reference count to 0
   if(kmem.use_lock){
     release(&kmem.lock);
     release(&rtable.lock);
@@ -157,8 +157,8 @@ kalloc(void)
   r = kmem.freelist;
   if(r){
     kmem.freelist = r->next;
-    kmem.numFreePages--;
-    setRcount((char*)V2P((unit)r),1);
+    kmem.numFreePages--;                         //increment free page count                           
+    setRcount((uint)V2P((uint)r),1);             //set reference count to 1
   }
 
   if(kmem.use_lock){
