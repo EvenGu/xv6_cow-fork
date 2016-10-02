@@ -273,8 +273,8 @@ deallocuvm(pde_t *pgdir, uint oldsz, uint newsz)
       if(pa == 0)
         panic("kfree");
       char *v = P2V(pa);
-      decrement(v);
-      if(checkZero(v)==0){
+      decrementRcount(pa);
+      if(getRcount(pa)==0){
       	kfree(v);
       }
       *pte = 0;
@@ -332,7 +332,11 @@ copyuvm(pde_t *pgdir, uint sz)
       panic("copyuvm: pte should exist");
     if(!(*pte & PTE_P))
       panic("copyuvm: page not present");
+  	if(*pte&PTE_w)
+  		*pte |= PTE_PREV;
+  	*pte |= PTE_COW;
   	*pte = *pte & ~PTE_W;
+
     pa = PTE_ADDR(*pte);
     flags = PTE_FLAGS(*pte);
 
@@ -342,8 +346,7 @@ copyuvm(pde_t *pgdir, uint sz)
     // if(mappages(d, (void*)i, PGSIZE, V2P(mem), flags) < 0)
     if(mappages(d, (void*)i, PGSIZE, pa, flags) < 0)
       goto bad;
-  	if()
-  	increment((char*)i);
+  	incrementRcount(pa);
   	lcr3(V2P(pgdir));				//as flags are changed
   }
   return d;

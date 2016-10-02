@@ -66,10 +66,10 @@ void            ioapicinit(void);
 
 // kalloc.c
 void            rinit(void);
-void 			increment(char*);
-void 			decrement(char*);
-int 			checkZero(char*);
-void 			setOne(char*);
+void 			incrementRcount(char*);
+void 			decrementRcount(char*);
+int 			getRcount(char*);
+void 			setRcount(char*,int);
 int 			getNumFreePages(void);
 char*           kalloc(void);
 void            kfree(char*);

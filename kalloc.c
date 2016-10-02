@@ -27,7 +27,7 @@ struct {
 
 
 struct{ 
-  uint rcount[NFRAMES];
+  int rcount[NFRAMES];
   struct spinlock lock;
 } rtable;
 
@@ -45,36 +45,28 @@ rinit(void)
   release(&rtable.lock);
 }
 
-void increment(char *va){
+void incrementRcount(uint pa){
   acquire(&rtable.lock);
-  uint pa = V2P(va)>>PGSHIFT;
-  rtable.rcount[pa]++;
+  rtable.rcount[pa>>PGSHIFT]++;
   release(&rtable.lock);
 }
-void decrement(char *va){
+void decrementRcount(uint pa){
   acquire(&rtable.lock);
-  uint pa = V2P(va)>>PGSHIFT;
-  rtable.rcount[pa]--;
+  rtable.rcount[pa>>PGSHIFT]--;
   release(&rtable.lock);
 }
 
 
-int checkZero(char *va){
+int getRcount(uint pa){
   acquire(&rtable.lock);
-  uint pa = V2P(va)>>PGSHIFT;
-  uint temp = rtable.rcount[pa];
+  uint temp = rtable.rcount[pa>>PGSHIFT];
   release(&rtable.lock);
   return temp;
 }
 
-void setOne(char *va){
-  uint pa = V2P(va)>>PGSHIFT;
-  rtable.rcount[pa] = 1 ;
-}
-
-void setZero(char* va){
-  uint pa = V2P(va)>>PGSHIFT;
-  rtable.rcount[pa] = 0 ;
+/*Lock must be held*/
+void setRcount(uint pa,int i){
+  rtable.rcount[pa>>PGSHIFT] = i;
 }
 
 int getNumFreePages(){
@@ -143,7 +135,7 @@ kfree(char *v)
   r->next = kmem.freelist;
   kmem.freelist = r;
   kmem.numFreePages++;
-  setZero((char*)r);
+  setRcount((char*)V2P((uint)r),0);
   if(kmem.use_lock){
     release(&kmem.lock);
     release(&rtable.lock);
@@ -166,7 +158,7 @@ kalloc(void)
   if(r){
     kmem.freelist = r->next;
     kmem.numFreePages--;
-    setOne((char*)r);
+    setRcount((char*)V2P((unit)r),1);
   }
 
   if(kmem.use_lock){
