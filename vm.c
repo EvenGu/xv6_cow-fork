@@ -333,10 +333,13 @@ copyuvm(pde_t *pgdir, uint sz)
     if(!(*pte & PTE_P))
       panic("copyuvm: page not present");
 
-  	*pte &= ~PTE_PREV;					//clear previous write permission 
-  	if(*pte & PTE_W)					//set previous write permission
-  		*pte |= PTE_PREV;
-  	*pte |= PTE_COW;					//set cow flag
+  	// *pte &= ~PTE_PREV;					//clear previous write permission 
+  	// if(*pte & PTE_W)					//set previous write permission
+  		// *pte |= PTE_PREV;
+    // else 
+      // *pte &= ~PTE_PREV;
+
+  	// *pte |= PTE_COW;					//set cow flag
   	*pte &= ~PTE_W;						//change the write permission to read only
 
     pa = PTE_ADDR(*pte);
@@ -418,14 +421,14 @@ void pagefault(uint err_code)						//page fault handling function
 		panic("Page was writable");
 	}
 
-	if(*pte & PTE_COW){									//PTE_W = 0 , PTE_PREV = 0 or 1 , PTE_COW = 1
+	// if(*pte & PTE_COW){									//PTE_W = 0 , PTE_PREV = 0 or 1 , PTE_COW = 1
 														//if trap due to copy on write 
 		pa = PTE_ADDR(*pte);
 		if(getRcount(pa) == 1){							//only need to change the page table entries
-			*pte &= ~PTE_COW;							//reset the cow flag
-			if(*pte & PTE_PREV)							//restore the previous write permission
+			// *pte &= ~PTE_COW;							//reset the cow flag
+			// if(*pte & PTE_PREV)							//restore the previous write permission
 				*pte = *pte | PTE_W;
-			*pte &= ~PTE_PREV;							//reset the previous write permission  
+			// *pte &= ~PTE_PREV;							//reset the previous write permission  
 		}
 		else if(getRcount(pa) > 1){						//allocate new memory image and change the page table
 			mem = kalloc();
@@ -436,23 +439,23 @@ void pagefault(uint err_code)						//page fault handling function
 			}
 			memmove(mem,(char*)P2V(pa),PGSIZE);					//copy the memory
 			decrementRcount(va);								//decrement reference count
-			if(*pte & PTE_PREV)
+			// if(*pte & PTE_PREV)
 				*pte = V2P(mem) | PTE_P | PTE_U | PTE_W;		//restore previous write permission	
-			else
-				*pte = V2P(mem) | PTE_P | PTE_U ;
-			*pte &= ~PTE_COW;									//reset the cow and previous write permission 
-			*pte &= ~PTE_PREV;
+			// else
+				// *pte = V2P(mem) | PTE_P | PTE_U ;
+			// *pte &= ~PTE_COW;									//reset the cow and previous write permission 
+			// *pte &= ~PTE_PREV;
 		}
 		else{
 			panic("Wrong reference count");
 		}
 		lcr3(V2P(proc->pgdir));
-	}
-	else{											//PTE_W = 0 , PTE_PREV = 0 or 1 , PTE_COW = 0
-		cprintf("No write permission\n");			//no write permission default is to kill the process
-		proc->killed = 1;
-		return;
-	}
+	// }
+	// else{											//PTE_W = 0 , PTE_PREV = 0 or 1 , PTE_COW = 0
+		// cprintf("No write permission\n");			//no write permission default is to kill the process
+		// proc->killed = 1;
+		// return;
+	// }
 }
 //PAGEBREAK!
 // Blank page.
