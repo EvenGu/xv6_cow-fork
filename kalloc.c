@@ -62,8 +62,9 @@ void decrement(char *va){
 int checkZero(char *va){
   acquire(&rtable.lock);
   uint pa = V2P(va)>>PGSHIFT;
+  uint temp = rtable.rcount[pa];
   release(&rtable.lock);
-  return rtable.rcount[pa];
+  return temp;
 }
 
 void setOne(char *va){
@@ -71,8 +72,21 @@ void setOne(char *va){
   rtable.rcount[pa] = 1 ;
 }
 
+void setZero(char* va){
+  uint pa = V2P(va)>>PGSHIFT;
+  rtable.rcount[pa] = 0 ;
+}
+
 int getNumFreePages(){
-  return kmem.numFreePages;
+  if(kmem.use_lock){
+    acquire(&kmem.lock);
+  }
+  int temp = kmem.numFreePages;
+
+  if(kmem.use_lock){
+    release(&kmem.lock);
+  }
+  return temp;
 }
 // Initialization happens in two phases.
 // 1. main() calls kinit1() while still using entrypgdir to place just
@@ -121,14 +135,19 @@ kfree(char *v)
   // Fill with junk to catch dangling refs.
   memset(v, 1, PGSIZE);
 
-  if(kmem.use_lock)
+  if(kmem.use_lock){
     acquire(&kmem.lock);
+    acquire(&rtable.lock);
+  }
   r = (struct run*)v;
   r->next = kmem.freelist;
   kmem.freelist = r;
   kmem.numFreePages++;
-  if(kmem.use_lock)
+  setZero((char*)r);
+  if(kmem.use_lock){
     release(&kmem.lock);
+    release(&rtable.lock);
+  }
 }
 
 // Allocate one 4096-byte page of physical memory.

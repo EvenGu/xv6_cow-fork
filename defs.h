@@ -70,12 +70,11 @@ void 			increment(char*);
 void 			decrement(char*);
 int 			checkZero(char*);
 void 			setOne(char*);
-
+int 			getNumFreePages(void);
 char*           kalloc(void);
 void            kfree(char*);
 void            kinit1(void*, void*);
 void            kinit2(void*, void*);
-// extern struct 	rtable;
 
 // kbd.c
 void            kbdintr(void);
