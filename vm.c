@@ -395,6 +395,47 @@ copyout(pde_t *pgdir, uint va, void *p, uint len)
   return 0;
 }
 
+
+void pagefault(uint err_code)
+{
+	uint va = rcr2();
+	uint pa;
+	pte_t = *pte;
+	char* mem;
+
+	if(proc == 0){
+		panic("Error no proc");
+	}
+	if(va>=KERNBASE || (pte = walkpgdir(proc->pgdir,(void*)va,0)==0) || !(*pte & PTE_P) || !(*pte & PTE_U)){
+		panic("Some other prob");
+	}
+
+	if(*pte & PTE_W){
+		panic("Page was writable");
+	}
+	else{
+		pa = PTE_ADDR(*pte);
+		if(getRcount(pa) == 1){
+			*pte = *pte | PTE_W;
+		}
+		else if(getRcount(pa) > 1){
+			mem = kalloc();
+			if(mem == 0){
+
+				panic();
+				proc->killed;
+				return;
+			}
+			memmove(mem,(char*)p2v(pa),PGSIZE);
+			decrementRcount(va);
+			*pte = v2p(mem) | PTE_P | PTE_W | PTE_U;
+		}
+		else{
+			panic("Pagefault wrong reference count");
+		}
+		lcr3(v2p(proc->pgdir));
+	}
+}
 //PAGEBREAK!
 // Blank page.
 //PAGEBREAK!
